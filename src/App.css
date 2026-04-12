@@ -64,3 +64,22 @@
   font-size: 0.75rem;
   color: #666;
 }
+
+.storage-test {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #3333;
+}
+
+.storage-test-msg {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+}
+
+.storage-test-ok {
+  color: #2e7d32;
+}
+
+.storage-test-err {
+  color: #c62828;
+}

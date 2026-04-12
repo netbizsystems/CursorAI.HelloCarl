@@ -36,6 +36,8 @@ function useAuth() {
 function App() {
   const { authenticated, onAuthenticated, signOut } = useAuth()
   const [count, setCount] = useState(0)
+  const [storageTest, setStorageTest] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
+  const [storageTestMessage, setStorageTestMessage] = useState('')
   const [sessionRemaining, setSessionRemaining] = useState(() => {
     const exp = getTokenExpiryMs()
     return exp ? formatSessionRemaining(exp - Date.now()) : ''
@@ -79,6 +81,34 @@ function App() {
     }
   }, [authenticated, signOut])
 
+  const testStorageConnection = useCallback(async () => {
+    setStorageTest('loading')
+    setStorageTestMessage('')
+    try {
+      const res = await fetch('/api/health/storage')
+      const text = await res.text()
+      let data: { ok?: boolean; error?: string; container?: string; emulator?: boolean } = {}
+      try {
+        if (text.trim()) data = JSON.parse(text) as typeof data
+      } catch {
+        setStorageTest('error')
+        setStorageTestMessage('Invalid response from server')
+        return
+      }
+      if (!res.ok || data.ok === false) {
+        setStorageTest('error')
+        setStorageTestMessage(data.error ?? `HTTP ${res.status}`)
+        return
+      }
+      setStorageTest('ok')
+      const backend = data.emulator ? 'Azurite (local)' : 'Azure Storage'
+      setStorageTestMessage(`${backend} — container "${data.container ?? '?'}"`)
+    } catch (e) {
+      setStorageTest('error')
+      setStorageTestMessage(e instanceof Error ? e.message : 'Request failed')
+    }
+  }, [])
+
   if (!authenticated) {
     return <OTPLogin onAuthenticated={onAuthenticated} />
   }
@@ -101,6 +131,21 @@ function App() {
         <p>
           Edit <code>src/App.tsx</code> and save to test HMR
         </p>
+        <div className="storage-test">
+          <button
+            type="button"
+            onClick={testStorageConnection}
+            disabled={storageTest === 'loading'}
+          >
+            {storageTest === 'loading' ? 'Testing storage…' : 'Test storage connection'}
+          </button>
+          {storageTest === 'ok' && (
+            <p className="storage-test-msg storage-test-ok">{storageTestMessage}</p>
+          )}
+          {storageTest === 'error' && (
+            <p className="storage-test-msg storage-test-err">{storageTestMessage}</p>
+          )}
+        </div>
       </div>
       <p className="read-the-docs">
         Click on the Vite and React logos to learn more

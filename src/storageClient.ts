@@ -1,6 +1,6 @@
 /**
- * Client for Azurite local storage (via the storage API server).
- * Use when Azurite and the storage API are running (npm run azurite, npm run storage-api).
+ * Client for app blob storage via the storage API (Azure Storage or local Azurite).
+ * Requires the storage API (`npm run storage-api` or `npm run dev:all`).
  */
 
 import { authHeaders } from './auth';
