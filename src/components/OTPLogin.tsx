@@ -16,6 +16,25 @@ interface Props {
 
 type Step = 'email' | 'pin';
 
+/** Avoids `Unexpected end of JSON input` when proxy/API returns an empty body (e.g. 502 if API is down). */
+async function readApiJson(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  const trimmed = text.trim();
+  if (!trimmed) {
+    if (res.status === 502 || res.status === 503) {
+      throw new Error(
+        'Sign-in service is unreachable. Run npm run dev:all locally (Vite + API), and point the tunnel at the Vite port (5180).',
+      );
+    }
+    throw new Error(`Empty response from server (${res.status}). Is the storage API running on port 3020?`);
+  }
+  try {
+    return JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    throw new Error(`Invalid response from server (${res.status}). Expected JSON from the storage API.`);
+  }
+}
+
 export default function OTPLogin({ onAuthenticated }: Props) {
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
@@ -33,8 +52,8 @@ export default function OTPLogin({ onAuthenticated }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send PIN');
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(String(data.error ?? 'Failed to send PIN'));
       setDevMode(data.devMode === true);
       setStep('pin');
     } catch (err: unknown) {
@@ -53,9 +72,13 @@ export default function OTPLogin({ onAuthenticated }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, pin }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Verification failed');
-      setToken(data.token);
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(String(data.error ?? 'Verification failed'));
+      const token = data.token;
+      if (typeof token !== 'string' || !token) {
+        throw new Error('Invalid response: missing token');
+      }
+      setToken(token);
       onAuthenticated();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong');

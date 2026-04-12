@@ -10,7 +10,8 @@ const AZURITE_CONNECTION_STRING =
   'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;';
 
 const CONTAINER_NAME = 'local-storage';
-const PORT = process.env.STORAGE_API_PORT || 3001;
+// Distinct from template (HelloDave) default 3001 so both apps can run locally.
+const PORT = process.env.STORAGE_API_PORT || 3020;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-please-change-me';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 const OTP_EXPIRY_MS = 10 * 60 * 1000;

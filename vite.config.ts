@@ -5,14 +5,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
-    port: 5173,
+    // Distinct from template (HelloDave) default 5174 so both apps can run locally.
+    port: 5180,
     allowedHosts: [
-      'hellodave.netbizsystems.com',
-      'hellojan.netbizsystems.com',
       'hellocarl.netbizsystems.com'
     ],
     proxy: {
-      '/api': { target: 'http://127.0.0.1:3001', changeOrigin: true },
+      '/api': { target: 'http://127.0.0.1:3020', changeOrigin: true },
     },
   }
 })
