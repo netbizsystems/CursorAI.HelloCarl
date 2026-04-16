@@ -5,21 +5,12 @@ import { BlobServiceClient } from '@azure/storage-blob';
 import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
 
-const AZURITE_DEFAULT =
-  'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;';
-
 /** Azure Storage account (e.g. hellocarl2026): Portal → Access keys → Connection string. */
-const STORAGE_CONNECTION_STRING =
-  process.env.AZURE_STORAGE_CONNECTION_STRING ||
-  process.env.AZURITE_CONNECTION_STRING ||
-  AZURITE_DEFAULT;
+const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
 
 /** Blob container; created if missing. */
 const CONTAINER_NAME = process.env.AZURE_STORAGE_CONTAINER || 'hellocarl-data';
 
-function isAzuriteEmulator(connectionString) {
-  return /AccountName=devstoreaccount1|127\.0\.0\.1:10000/i.test(connectionString || '');
-}
 // Distinct from template (HelloDave) default 3001 so both apps can run locally.
 const PORT = process.env.STORAGE_API_PORT || 3020;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-please-change-me';
@@ -131,26 +122,17 @@ let containerClient;
 
 async function ensureContainer() {
   if (!blobServiceClient) {
-    blobServiceClient = BlobServiceClient.fromConnectionString(STORAGE_CONNECTION_STRING);
+    if (!AZURE_STORAGE_CONNECTION_STRING) {
+      throw new Error('AZURE_STORAGE_CONNECTION_STRING is not set');
+    }
+    blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
     containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
     await containerClient.createIfNotExists();
   }
   return containerClient;
 }
 
-async function waitForAzurite(maxAttempts = 30, intervalMs = 500) {
-  for (let i = 0; i < maxAttempts; i++) {
-    try {
-      await ensureContainer();
-      return;
-    } catch (err) {
-      if (i === maxAttempts - 1) throw err;
-      await new Promise((r) => setTimeout(r, intervalMs));
-    }
-  }
-}
-
-/** No auth — verifies the API process can reach blob storage (Azure or Azurite). */
+/** No auth — verifies the API process can reach Azure Blob storage. */
 app.get('/api/health/storage', async (req, res) => {
   try {
     const container = await ensureContainer();
@@ -158,7 +140,7 @@ app.get('/api/health/storage', async (req, res) => {
     res.json({
       ok: true,
       container: CONTAINER_NAME,
-      emulator: isAzuriteEmulator(STORAGE_CONNECTION_STRING),
+      emulator: false,
     });
   } catch (err) {
     console.error('Storage health check failed:', err);
@@ -241,25 +223,18 @@ function streamToString(stream) {
 }
 
 async function start() {
-  const emulator = isAzuriteEmulator(STORAGE_CONNECTION_STRING);
-  if (process.env.WAIT_FOR_AZURITE === '1' && emulator) {
-    try {
-      await waitForAzurite();
-    } catch (err) {
-      console.error('Azurite not ready:', err.message);
-      process.exit(1);
-    }
-  } else if (process.env.WAIT_FOR_AZURITE === '1' && !emulator) {
-    try {
-      await ensureContainer();
-    } catch (err) {
-      console.error('Azure Storage not reachable:', err.message);
-      process.exit(1);
-    }
+  if (!AZURE_STORAGE_CONNECTION_STRING) {
+    console.error('Missing AZURE_STORAGE_CONNECTION_STRING (Azure Storage account connection string).');
+    process.exit(1);
+  }
+  try {
+    await ensureContainer();
+  } catch (err) {
+    console.error('Azure Storage init failed:', err.message);
+    process.exit(1);
   }
   app.listen(PORT, () => {
-    const backend = emulator ? 'Azurite (local)' : 'Azure Storage';
-    console.log(`Storage API at http://127.0.0.1:${PORT}/api/storage (${backend}, container: ${CONTAINER_NAME})`);
+    console.log(`Storage API (Azure Blob, container "${CONTAINER_NAME}") at http://127.0.0.1:${PORT}/api/storage`);
   });
 }
 

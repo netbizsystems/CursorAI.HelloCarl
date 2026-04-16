@@ -1,5 +1,4 @@
-
-// this script is run at windows startup: C:\Users\dande\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup
+# this script is run at windows startup: C:\Users\dande\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup
 # HelloCarl — Vite 5180, API 3020. Do not use HelloDave's folder.
 Set-Location "C:\Users\dande\source\repos\CursorAI.HelloCarl"
 
