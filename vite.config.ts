@@ -7,6 +7,8 @@ export default defineConfig({
     host: true,
     // Distinct from template (HelloDave) default 5174 so both apps can run locally.
     port: 5180,
+    // Cloudflare route targets 5180; do not silently shift to 5181+.
+    strictPort: true,
     allowedHosts: [
       'hellocarl.netbizsystems.com'
     ],
