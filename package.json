@@ -12,6 +12,7 @@
     "dev:all": "concurrently -n api,dev -c green,magenta \"npm run storage-api\" \"npm run dev\""
   },
   "dependencies": {
+    "@azure/data-tables": "^13.3.2",
     "@azure/storage-blob": "^12.31.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",

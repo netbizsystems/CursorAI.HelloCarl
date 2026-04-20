@@ -87,7 +87,15 @@ function App() {
     try {
       const res = await fetch('/api/health/storage')
       const text = await res.text()
-      let data: { ok?: boolean; error?: string; container?: string; emulator?: boolean } = {}
+      let data: {
+        ok?: boolean
+        error?: string
+        container?: string
+        table?: string
+        requestedTableName?: string
+        rowKey?: string
+        emulator?: boolean
+      } = {}
       try {
         if (text.trim()) data = JSON.parse(text) as typeof data
       } catch {
@@ -102,7 +110,12 @@ function App() {
       }
       setStorageTest('ok')
       const backend = data.emulator ? 'Azurite (local)' : 'Azure Storage'
-      setStorageTestMessage(`${backend} — container "${data.container ?? '?'}"`)
+      const tableLabel = data.requestedTableName
+        ? `"${data.requestedTableName}" (actual: "${data.table ?? '?'}")`
+        : `"${data.table ?? '?'}"`
+      setStorageTestMessage(
+        `${backend} — container "${data.container ?? '?'}", table ${tableLabel}, inserted row "${data.rowKey ?? '?'}"`,
+      )
     } catch (e) {
       setStorageTest('error')
       setStorageTestMessage(e instanceof Error ? e.message : 'Request failed')
@@ -116,10 +129,10 @@ function App() {
   return (
     <>
       <div>
-        <a href="https://vite.dev" target="_blank">
+        <a href="https://vite.dev" target="_blank" rel="noreferrer noopener">
           <img src={viteLogo} className="logo" alt="Vite logo" />
         </a>
-        <a href="https://react.dev" target="_blank">
+        <a href="https://react.dev" target="_blank" rel="noreferrer noopener">
           <img src={reactLogo} className="logo react" alt="React logo" />
         </a>
       </div>

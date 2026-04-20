@@ -2,6 +2,7 @@ import 'dotenv/config';
 import crypto from 'node:crypto';
 import express from 'express';
 import { BlobServiceClient } from '@azure/storage-blob';
+import { TableClient } from '@azure/data-tables';
 import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
 
@@ -10,6 +11,9 @@ const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STR
 
 /** Blob container; created if missing. */
 const CONTAINER_NAME = process.env.AZURE_STORAGE_CONTAINER || 'hellocarl-data';
+const REQUESTED_HEALTH_TABLE_NAME = 'hellocarl-healthcheck';
+// Azure Table names must be alphanumeric (no dashes), so we normalize once here.
+const HEALTH_TABLE_NAME = REQUESTED_HEALTH_TABLE_NAME.replace(/[^A-Za-z0-9]/g, '');
 
 // Distinct from template (HelloDave) default 3001 so both apps can run locally.
 const PORT = process.env.STORAGE_API_PORT || 3020;
@@ -119,6 +123,7 @@ app.post('/api/auth/verify', (req, res) => {
 // ── Storage routes (all require auth) ────────────────────────────────────────
 let blobServiceClient;
 let containerClient;
+let healthTableClient;
 
 async function ensureContainer() {
   if (!blobServiceClient) {
@@ -132,14 +137,37 @@ async function ensureContainer() {
   return containerClient;
 }
 
+async function ensureHealthTable() {
+  if (!healthTableClient) {
+    if (!AZURE_STORAGE_CONNECTION_STRING) {
+      throw new Error('AZURE_STORAGE_CONNECTION_STRING is not set');
+    }
+    healthTableClient = TableClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING, HEALTH_TABLE_NAME);
+    await healthTableClient.createTable();
+  }
+  return healthTableClient;
+}
+
 /** No auth — verifies the API process can reach Azure Blob storage. */
 app.get('/api/health/storage', async (req, res) => {
   try {
     const container = await ensureContainer();
+    const table = await ensureHealthTable();
     await container.getProperties();
+    const rowKey = `${Date.now()}-${crypto.randomUUID()}`;
+    await table.upsertEntity({
+      partitionKey: 'healthcheck',
+      rowKey,
+      checkedAtUtc: new Date().toISOString(),
+      app: 'HelloCarl',
+      endpoint: '/api/health/storage',
+    });
     res.json({
       ok: true,
       container: CONTAINER_NAME,
+      table: HEALTH_TABLE_NAME,
+      requestedTableName: REQUESTED_HEALTH_TABLE_NAME,
+      rowKey,
       emulator: false,
     });
   } catch (err) {
@@ -229,12 +257,26 @@ async function start() {
   }
   try {
     await ensureContainer();
+    try {
+      await ensureHealthTable();
+    } catch (err) {
+      // Table may already exist from previous run.
+      if (err?.statusCode !== 409) throw err;
+      healthTableClient = TableClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING, HEALTH_TABLE_NAME);
+    }
   } catch (err) {
     console.error('Azure Storage init failed:', err.message);
     process.exit(1);
   }
   app.listen(PORT, () => {
-    console.log(`Storage API (Azure Blob, container "${CONTAINER_NAME}") at http://127.0.0.1:${PORT}/api/storage`);
+    if (HEALTH_TABLE_NAME !== REQUESTED_HEALTH_TABLE_NAME) {
+      console.log(
+        `Healthcheck table requested "${REQUESTED_HEALTH_TABLE_NAME}" normalized to "${HEALTH_TABLE_NAME}" to satisfy Azure Table naming rules.`,
+      );
+    }
+    console.log(
+      `Storage API (Azure Blob container "${CONTAINER_NAME}", health table "${HEALTH_TABLE_NAME}") at http://127.0.0.1:${PORT}/api/storage`,
+    );
   });
 }
 
